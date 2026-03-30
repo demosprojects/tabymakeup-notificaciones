@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TabyMakeup | Administración</title>
+  <link rel="stylesheet" href="admin.css">
+  <link rel="icon" href="logo-icon.jpg" type="image/webp">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Dancing+Script&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+  <!-- Agregar CSS de Intro.js -->
+  
+  <link rel="icon" href="https://i.ibb.co/qYWjKTSd/logo.webp" type="image/webp">
+</head>
+<body>
+  <header class="admin-header" data-step="1" data-intro="Bienvenido al Panel de Administración de TabyMakeup. Aquí puedes gestionar tus productos.">
+    <div class="logo-container">
+      <h1 class="logo">
+        <span class="nombre">Taby</span><span class="makeup">Makeup</span>
+      </h1>
+      <span class="admin-title">Panel de Administración</span>
+    </div>
+   <div class="header-actions">
+   <a href="https://tabymakeup.com.ar" class="volver-tienda">
+        <i class="fas fa-arrow-left"></i> Ir a la tienda
+      </a>
+      <a href="pedidos.html" class="volver-tienda">
+  <i class="fas fa-shopping-bag"></i> Pedidos
+</a>
+      <button id="logout-btn" class="btn-logout" data-step="3" data-intro="Cierra tu sesión desde este botón cuando termines.">
+        <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+      </button>
+    </div>
+
+ <button id="upload-image-btn" class="btn-tour" aria-label="Generar link de imagen">
+  <i class="fas fa-image"></i> 
+  <span class="tour-text">Generar</span>
+  
+</button>
+
+  </header>
+<main class="admin-main">
+    <section class="admin-container">
+      <!-- Contenedor de tarjetas de productos -->
+      <div class="card table-card">
+        <div class="table-header" data-step="5" data-intro="Aquí puedes ver todos los productos, buscarlos y agregar nuevos.">
+          <h2><i class="fas fa-list"></i> Productos existentes</h2>
+          <div class="header-controls">
+            <div class="table-search">
+              <input type="text" id="table-search" placeholder="Buscar producto..." data-step="6" data-intro="Usa este campo para buscar productos por nombre o categoría.">
+              <i class="fas fa-search"></i>
+            </div>
+            <select id="disponibilidad-filter" class="filter-select" data-step="6.1" data-intro="Filtra productos por disponibilidad">
+              <option value="all">Todos</option>
+              <option value="available">Disponibles</option>
+              <option value="unavailable">No disponibles</option>
+            </select>
+            <select id="categoria-filter" class="filter-select" data-step="6.2" data-intro="Filtra productos por categoría">
+              <option value="all">Todas las categorías</option>
+              <option value="iluminadores">Iluminadores y contornos</option>
+              <option value="combos">Combos</option>
+              <option value="base">Base</option>
+              <option value="brochas">Brochas</option>
+              <option value="delineadores">Delineadores</option>
+              <option value="fijador">Fijador</option>
+              <option value="mascara">Máscara de pestañas</option>
+              <option value="polvos">Polvos</option>
+              <option value="rubor">Rubor</option>
+              <option value="sombras">Sombras</option>
+              <option value="arqueadores">Arqueadores</option>
+              <option value="brillos">Brillos/Glitter</option>
+              <option value="correctores">Correctores</option>
+              <option value="esponjitas">Esponjitas</option>
+              <option value="labiales">Labiales</option>
+              <option value="pestanas-cejas">Pestañas/Cejas</option>
+              <option value="primer">Primer</option>
+              <option value="skincare">Skincare</option>
+              <option value="skalas">Skalas</option>
+              <option value="varios">Varios</option>
+              <option value="ofertas">Ofertas</option>
+            </select>
+            <button id="agregar-producto-btn" class="btn-add-product" data-step="7" data-intro="Haz clic aquí para agregar un nuevo producto.">
+              <i class="fas fa-plus"></i> Nuevo producto
+            </button>
+          </div>
+        </div>
+        <div class="card-container" id="cuerpo-productos" data-step="8" data-intro="Aquí se muestran las tarjetas de los productos. Puedes editar o eliminar cada uno.">
+          <!-- Las tarjetas se cargarán dinámicamente aquí -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal para agregar/editar productos -->
+  <div id="modal-producto" class="modal" data-step="9" data-intro="En este formulario puedes agregar o editar los detalles de un producto.">
+    <div class="modal-content">
+      <span class="modal-close">×</span>
+      <h2 id="form-title"><i class="fas fa-plus-circle"></i> Agregar producto</h2>
+      <form id="form-producto">
+        <input type="hidden" id="producto-id">
+        <div class="form-group">
+          <label for="nombre">Nombre del producto</label>
+          <input type="text" id="nombre" placeholder="Ej: Base Mate" required data-step="10" data-intro="Ingresa el nombre del producto aquí.">
+        </div>
+        <div class="form-group">
+          <label for="categoria">Categoría</label>
+          <select id="categoria" required data-step="11" data-intro="Selecciona la categoría del producto.">
+            <option value="">Selecciona una categoría</option>
+            <option value="ofertas">Ofertas</option>
+            <option value="iluminadores">Iluminadores y contornos</option>
+             <option value="combos">Combos</option>
+            <option value="base">Base</option>
+            <option value="brochas">Brochas</option>
+            <option value="delineadores">Delineadores</option>
+            <option value="fijador">Fijador</option>
+            <option value="mascara">Máscara de pestañas</option>
+            <option value="polvos">Polvos</option>
+            <option value="rubor">Rubor</option>
+            <option value="sombras">Sombras</option>
+            <option value="arqueadores">Arqueadores</option>
+            <option value="brillos">Brillos/Glitter</option>
+            <option value="correctores">Correctores</option>
+            <option value="esponjitas">Esponjitas</option>
+            <option value="labiales">Labiales</option>
+            <option value="pestanas-cejas">Pestañas/Cejas</option>
+            <option value="primer">Primer</option>
+            <option value="skincare">Skincare</option>
+            <option value="skalas">Skalas</option>
+            <option value="varios">Varios</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="precio">Precio ($)</label>
+          <input type="number" id="precio" step="0.01" placeholder="Ej: 1500" required data-step="12" data-intro="Define el precio del producto.">
+        </div>
+        <div class="form-group accordion-group">
+          <button type="button" class="accordion-toggle" id="toggle-oferta">
+            <span><i class="fas fa-tag"></i> Precio de oferta</span>
+            <i class="fas fa-chevron-down accordion-icon"></i>
+          </button>
+          <div class="accordion-body" id="accordion-oferta">
+            <label for="precioAnterior">Precio anterior ($)</label>
+            <input type="number" id="precioAnterior" step="0.01" placeholder="Ej: 1999">
+            <p class="accordion-hint">El precio actual se mostrará como precio de oferta y este como precio tachado.</p>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="descripcion">Descripción (opcional)</label>
+          <textarea id="descripcion" placeholder="Ej: Base de maquillaje de larga duración con acabado mate..." rows="3"></textarea>
+        </div>
+<div class="form-group">
+  <label for="imagen">URL de la imagen</label>
+  <div style="display: flex; gap: 10px;">
+    <input type="text" id="imagen" placeholder="Pegar o generar" required style="flex: 1;">
+    <button type="button" id="subir-desde-input" class="btn-secondary">
+      <i class="fas fa-upload"></i>
+    </button>
+  </div>
+  <div class="image-preview">
+    <img id="imagen-preview" src="" alt="Previsualización de la imagen" style="display: none;">
+  </div>
+
+  <div class="form-hint-link" style="margin-top: 12px; padding: 12px; background: #fff7f0; border-left: 4px solid #ff914d; border-radius: 6px; font-size: 0.95em; display: flex; align-items: center; gap: 10px;">
+    <i class="fas fa-link" style="color: #ff914d;"></i>
+    <span>
+    ¿No se sube la imagen? 
+      <a href="https://admintabymakeup.netlify.app/imagenes" target="_blank" rel="noopener noreferrer" style="color: #d35400; font-weight: 500; text-decoration: underline;">
+       Generar desde aca
+      </a>
+    </span>
+  </div>
+</div>
+
+
+        <div class="form-group checkbox-group">
+          <label for="disponible">Disponible</label>
+          <input type="checkbox" id="disponible" checked data-step="15" data-intro="Marca si el producto está disponible.">
+        </div>
+        <div class="form-group checkbox-group">
+  <label for="esNuevo">Es nuevo</label>
+  <input type="checkbox" id="esNuevo">
+</div>
+        <div class="form-group tonos-group">
+          <label>Variantes (opcional)</label>
+          <div id="tonos-container" data-step="16" data-intro="Agrega tonos opcionales para el producto, como colores o acabados."></div>
+          <button type="button" id="agregar-tono" class="btn-secondary" data-step="17" data-intro="Haz clic para agregar un nuevo tono."><i class="fas fa-plus"></i> Agregar</button>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn-primary" id="submit-btn" data-step="18" data-intro="Guarda los cambios o agrega el producto.">
+            <i class="fas fa-save"></i> 
+            <span class="btn-text">Guardar producto</span>
+            <i class="fas fa-spinner fa-spin btn-spinner" style="display: none;"></i>
+          </button>
+          <button type="button" id="cancelar-edicion" class="btn-secondary" style="display: none;" data-step="19" data-intro="Cancela la edición si estás modificando un producto.">Cancelar edición</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal para imagen ampliada -->
+  <div id="modal-imagen-ampliada" class="modal-imagen">
+    <span class="modal-imagen-close">×</span>
+    <img id="imagen-ampliada" src="" alt="Imagen ampliada">
+  </div>
+
+  <footer class="admin-footer" data-step="20" data-intro="Aquí están los enlaces a las redes sociales y el copyright.">
+    <div class="footer-redes">
+      <a href="https://www.instagram.com/taby.makeup/" target="_blank" aria-label="Instagram">
+        <i class="fab fa-instagram"></i>
+      </a>
+      <a href="https://www.facebook.com/" target="_blank" aria-label="Facebook">
+        <i class="fab fa-facebook-f"></i>
+      </a>
+      <a href="https://wa.me/5493735401893?text=Hola%20quiero%20hacer%20una%20consulta" target="_blank" aria-label="WhatsApp">
+        <i class="fab fa-whatsapp"></i>
+      </a>
+    </div>
+    <p>© 2025 TabyMakeup. Todos los derechos reservados.</p>
+  </footer>
+  <!-- Modal de Confirmación -->
+  <div id="logoutConfirmModal" class="confirm-modal">
+    <div class="confirm-modal-content">
+      <h3>¿Estás seguro?</h3>
+      <p>¿Realmente deseas cerrar tu sesión?</p>
+      <div class="confirm-modal-buttons">
+        <button id="confirmLogout" class="confirm-btn">Sí, cerrar sesión</button>
+        <button id="cancelLogout" class="cancel-btn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scroll to Top Button -->
+  <button id="scroll-top-btn" class="scroll-top-btn" title="Volver arriba" data-step="21" data-intro="Usa este botón para volver al inicio de la página.">
+    <i class="fas fa-arrow-up"></i>
+  </button>
+
+
+<!-- Modal para subir imágenes -->
+<div id="image-upload-modal" class="modal">
+  <div class="modal-content">
+    <span class="modal-close" id="close-upload-modal">×</span>
+    <h3>Subir imagen</h3>
+    
+    <!-- Opciones de subida -->
+    <div class="upload-options">
+      <button type="button" id="take-photo-btn" class="upload-option-btn">
+        <i class="fas fa-camera"></i>
+        <span>Tomar foto</span>
+      </button>
+      <button type="button" id="select-file-btn" class="upload-option-btn">
+        <i class="fas fa-folder-open"></i>
+        <span>Seleccionar archivo</span>
+      </button>
+    </div>
+    
+    <div class="upload-area" id="drop-zone" style="display: none;">
+      <input 
+        type="file" 
+        id="imageInput" 
+        class="file-input" 
+        accept="image/*">
+      <input 
+        type="file" 
+        id="cameraInput" 
+        class="file-input" 
+        accept="image/*" 
+        capture="environment">
+
+      <i class="fas fa-cloud-upload-alt icon-large"></i>
+      <p id="file-info">Arrastra la imagen aquí o hace clic para seleccionar</p>
+    </div>
+    
+    <div class="upload-status hidden" id="upload-status">
+      <div id="upload-progress" class="hidden">
+        <div class="spinner"></div>
+        <p>Subiendo imagen...</p>
+      </div>
+      <div id="upload-success" class="hidden">
+        <i class="fas fa-check-circle"></i>
+        <p>¡Imagen subida exitosamente!</p>
+      </div>
+    </div>
+    
+    <div class="preview-section hidden" id="preview-section">
+      <h4>Vista previa</h4>
+      <div class="image-preview-container">
+        <div class="preview-header">
+          <span>Previsualización</span>
+          <button id="clear-preview" class="btn-icon"><i class="fas fa-times"></i></button>
+        </div>
+        <img id="uploaded-image-preview" class="image-preview" src="" alt="Vista previa">
+      </div>
+    </div>
+    
+    <div class="url-section hidden" id="image-link-container">
+      <h4>Enlace:</h4>
+      <div class="url-copy-group">
+        <input type="text" id="image-url" readonly>
+        <button id="copy-url-btn" class="btn-primary"><i class="fas fa-copy"></i> Copiar</button>
+      </div>
+    </div>
+    
+    <div class="modal-actions">
+      <button id="upload-btn" class="btn-primary" disabled>Subir</button>
+      <button id="cancel-upload-btn" class="btn-secondary">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+
+  <!-- Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/intro.js/7.2.0/intro.min.js"></script>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

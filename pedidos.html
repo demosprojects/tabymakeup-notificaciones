@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TabyMakeup | Pedidos</title>
+  <link rel="icon" href="https://i.ibb.co/qYWjKTSd/logo.webp" type="image/webp">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { poppins: ['Poppins', 'sans-serif'] },
+          colors: {
+            primary: '#ff69b4',
+            'primary-dark': '#ff4da6',
+            'primary-light': '#ffe6f0',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Poppins', sans-serif; }
+
+    .bg-gradient-taby { background: linear-gradient(135deg, #ffe6f0 0%, #fff5f7 100%); }
+
+    @keyframes pulse-badge {
+      0%, 100% { transform: scale(1); }
+      50%       { transform: scale(1.15); }
+    }
+    .badge-new { animation: pulse-badge 1.5s ease-in-out infinite; }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: 3px 10px;
+      border-radius: 9999px;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .order-card { animation: fadeInUp .25s ease both; }
+
+    .modal-backdrop {
+      background: rgba(0,0,0,.45);
+      backdrop-filter: blur(3px);
+    }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #fce7f3; }
+    ::-webkit-scrollbar-thumb { background: #f9a8d4; border-radius: 99px; }
+
+    #toast {
+      transition: opacity .3s, transform .3s;
+      pointer-events: none;
+    }
+
+    /* Spinner para preview del ticket */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ticket-spinner {
+      width: 28px; height: 28px;
+      border: 2px solid rgba(255,105,180,0.3);
+      border-top-color: #ff69b4;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+  </style>
+</head>
+<body class="bg-gradient-taby min-h-screen">
+
+  <!-- HEADER -->
+  <header class="sticky top-0 z-50 bg-primary shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <h1 class="text-white font-light text-xl tracking-tight leading-none select-none">
+          <span class="font-bold">Taby</span>Makeup
+        </h1>
+        <span class="hidden sm:block text-pink-200 text-xs font-semibold uppercase tracking-widest border-l border-pink-300 pl-3">
+          Pedidos
+        </span>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <a href="admin.html"
+           class="flex items-center gap-1.5 text-white/90 hover:text-white text-xs font-semibold uppercase tracking-wide transition px-3 py-2 rounded-lg hover:bg-white/10">
+          <i class="fas fa-box-open text-sm"></i>
+          <span class="hidden sm:inline">Productos</span>
+        </a>
+        <a href="https://tabymakeup.com.ar"
+           class="flex items-center gap-1.5 text-white/90 hover:text-white text-xs font-semibold uppercase tracking-wide transition px-3 py-2 rounded-lg hover:bg-white/10">
+          <i class="fas fa-store text-sm"></i>
+          <span class="hidden sm:inline">Ver tienda</span>
+        </a>
+        <button id="logout-btn"
+                class="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-bold uppercase tracking-wide px-3 py-2 rounded-lg transition">
+          <i class="fas fa-sign-out-alt"></i>
+          <span class="hidden sm:inline">Salir</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+
+    <!-- Título + filtros -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div class="flex items-center gap-3">
+        <h2 class="text-gray-800 text-xl font-bold tracking-tight">
+          <i class="fas fa-shopping-bag text-primary mr-1"></i> Pedidos
+        </h2>
+        <span id="total-badge"
+              class="bg-primary text-white text-[10px] font-black px-2.5 py-1 rounded-full">0</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Búsqueda -->
+        <div class="relative">
+          <input id="search-input" type="text" placeholder="Buscar nombre o contacto…"
+                 class="pl-8 pr-3 py-2 text-xs border border-pink-200 rounded-lg bg-white/80 focus:outline-none focus:border-primary w-52 placeholder-gray-400">
+          <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+        </div>
+        <!-- Filtro estado -->
+        <select id="filter-estado"
+                class="text-xs border border-pink-200 rounded-lg bg-white/80 px-3 py-2 focus:outline-none focus:border-primary cursor-pointer">
+          <option value="all">Todos los estados</option>
+          <option value="nuevo">Nuevos</option>
+          <option value="contactado">Contactado</option>
+          <option value="enviado">Enviado</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+        <!-- Filtro pago -->
+        <select id="filter-pago"
+                class="text-xs border border-pink-200 rounded-lg bg-white/80 px-3 py-2 focus:outline-none focus:border-primary cursor-pointer">
+          <option value="all">Todos los pagos</option>
+          <option value="efectivo">Efectivo</option>
+          <option value="transferencia">Transferencia</option>
+          <option value="otro">Otro</option>
+        </select>
+        <!-- Ordenar -->
+        <select id="filter-orden"
+                class="text-xs border border-pink-200 rounded-lg bg-white/80 px-3 py-2 focus:outline-none focus:border-primary cursor-pointer">
+          <option value="desc">Más recientes</option>
+          <option value="asc">Más antiguos</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div class="bg-white/80 border border-pink-100 rounded-2xl p-4 shadow-sm">
+        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Total</p>
+        <p id="stat-total" class="text-2xl font-black text-gray-800">0</p>
+      </div>
+      <div class="bg-white/80 border border-pink-100 rounded-2xl p-4 shadow-sm">
+        <p class="text-[10px] font-bold uppercase tracking-widest text-yellow-500 mb-1">Nuevos</p>
+        <p id="stat-nuevos" class="text-2xl font-black text-yellow-500">0</p>
+      </div>
+      <div class="bg-white/80 border border-pink-100 rounded-2xl p-4 shadow-sm">
+        <p class="text-[10px] font-bold uppercase tracking-widest text-green-500 mb-1">Enviados</p>
+        <p id="stat-enviados" class="text-2xl font-black text-green-500">0</p>
+      </div>
+      <div class="bg-white/80 border border-pink-100 rounded-2xl p-4 shadow-sm">
+        <p class="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Recaudado</p>
+        <p id="stat-total-dinero" class="text-2xl font-black text-primary">$0</p>
+      </div>
+    </div>
+
+    <!-- Lista de pedidos -->
+    <div id="orders-list" class="space-y-3">
+      <div class="skeleton-wrap space-y-3">
+        <div class="h-28 bg-white/60 rounded-2xl animate-pulse border border-pink-100"></div>
+        <div class="h-28 bg-white/60 rounded-2xl animate-pulse border border-pink-100"></div>
+        <div class="h-28 bg-white/60 rounded-2xl animate-pulse border border-pink-100"></div>
+      </div>
+    </div>
+
+    <!-- Sin resultados -->
+    <div id="empty-state" class="hidden text-center py-20">
+      <i class="fas fa-shopping-bag text-4xl text-pink-200 mb-4"></i>
+      <p class="text-gray-400 text-sm font-semibold uppercase tracking-widest">Sin pedidos</p>
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="mt-16 py-6 text-center text-xs text-gray-400 border-t border-pink-100">
+    © 2025 TabyMakeup · Panel de administración
+  </footer>
+
+  <!-- ────────────────────────────────────────────
+       MODAL DETALLE DEL PEDIDO
+  ──────────────────────────────────────────── -->
+  <div id="detail-modal" class="fixed inset-0 z-50 hidden flex items-end sm:items-center justify-center sm:p-4 modal-backdrop">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
+
+      <!-- Línea decorativa top (mobile) -->
+      <div class="flex justify-center pt-3 pb-1 sm:hidden">
+        <div class="w-10 h-1 bg-gray-200 rounded-full"></div>
+      </div>
+
+      <!-- Header -->
+      <div class="flex items-start justify-between p-5 sm:p-6 border-b border-gray-100">
+        <div>
+          <h3 id="dm-nombre" class="text-base font-bold text-gray-800"></h3>
+          <p id="dm-fecha"   class="text-xs text-gray-400 mt-0.5"></p>
+        </div>
+        <!-- Botones de acción rápida (imprimir / imagen) -->
+        <div class="flex items-center gap-2 ml-3 shrink-0">
+          <!-- Imprimir ticket -->
+          <button id="dm-print-btn" title="Imprimir ticket"
+                  class="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-pink-100 text-gray-500 hover:text-primary transition">
+            <i class="fas fa-print text-sm"></i>
+          </button>
+          <!-- Descargar como imagen PNG -->
+          <button id="dm-img-btn" title="Descargar ticket como imagen"
+                  class="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-pink-100 text-gray-500 hover:text-primary transition">
+            <i class="fas fa-image text-sm"></i>
+          </button>
+          <!-- Cerrar -->
+          <button id="close-detail"
+                  class="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 text-lg transition">
+            <i class="fas fa-times text-sm"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-5 sm:p-6 space-y-5">
+        <!-- Info cliente -->
+        <div class="grid grid-cols-2 gap-3">
+          <!-- Contacto con botones -->
+          <div class="bg-pink-50 rounded-xl p-3 col-span-2">
+            <p class="text-[9px] font-black uppercase tracking-widest text-pink-400 mb-1">Contacto</p>
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <p id="dm-contacto" class="text-sm font-semibold text-gray-800 break-all"></p>
+              <div class="flex gap-1.5 shrink-0">
+                <!-- Copiar número -->
+                <button id="dm-copy-btn" title="Copiar número"
+                        class="flex items-center gap-1 text-[10px] font-bold text-gray-500 hover:text-primary bg-white border border-gray-200 hover:border-pink-300 px-2.5 py-1 rounded-full transition">
+                  <i class="far fa-copy text-[9px]"></i> Copiar
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- Medio de pago -->
+          <div class="bg-pink-50 rounded-xl p-3">
+            <p class="text-[9px] font-black uppercase tracking-widest text-pink-400 mb-1">Medio de pago</p>
+            <p id="dm-pago" class="text-sm font-semibold text-gray-800"></p>
+          </div>
+          <!-- Estado actual -->
+          <div class="bg-pink-50 rounded-xl p-3">
+            <p class="text-[9px] font-black uppercase tracking-widest text-pink-400 mb-1">Estado</p>
+            <div id="dm-estado-actual"></div>
+          </div>
+        </div>
+
+        <!-- Nota del cliente -->
+        <div id="dm-nota-wrap" class="hidden">
+          <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1.5">Nota del cliente</p>
+          <p id="dm-nota" class="text-sm text-gray-600 bg-gray-50 rounded-xl p-3 italic"></p>
+        </div>
+
+        <!-- Productos -->
+        <div>
+          <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2.5">Productos</p>
+          <div id="dm-items" class="space-y-2"></div>
+        </div>
+
+        <!-- Total -->
+        <div class="flex justify-between items-center bg-primary/10 rounded-xl px-4 py-3 border border-pink-200">
+          <span class="text-xs font-black uppercase tracking-widest text-gray-700">Total del pedido</span>
+          <span id="dm-total" class="text-lg font-black text-primary"></span>
+        </div>
+
+        <!-- Cambiar estado -->
+        <div>
+          <p class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">Cambiar estado</p>
+          <div id="dm-estado-btns" class="flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Acciones rápidas -->
+      <div class="px-5 sm:px-6 pb-6 flex flex-col sm:flex-row gap-2">
+        <a id="dm-wa-btn" href="#" target="_blank" rel="noopener"
+           class="flex-1 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold uppercase tracking-wide py-3 rounded-xl transition">
+          <i class="fab fa-whatsapp text-base"></i> Contactar por WhatsApp
+        </a>
+        <button id="dm-delete-btn"
+                class="flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 text-xs font-bold uppercase tracking-wide py-3 px-4 rounded-xl transition border border-red-200">
+          <i class="fas fa-trash-alt"></i> Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────
+       MODAL PREVIEW TICKET PNG
+  ──────────────────────────────────────────── -->
+  <div id="ticket-preview-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 modal-backdrop">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-hidden flex flex-col">
+
+      <!-- Línea dorada top -->
+      <div style="height:2px;background:linear-gradient(90deg,transparent,#ff69b4,transparent);flex-shrink:0;"></div>
+
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+        <div>
+          <h3 class="text-sm font-bold text-gray-800">Previsualización</h3>
+          <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Ticket · imagen PNG</p>
+        </div>
+        <button id="close-ticket-preview"
+                class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition text-sm">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Body: loader o imagen -->
+      <div class="flex-1 overflow-y-auto p-4 flex items-center justify-center">
+        <div class="bg-gray-50 rounded-2xl overflow-hidden w-full flex items-center justify-center min-h-[200px]">
+          <!-- Loader -->
+          <div id="ticket-preview-loader" class="flex flex-col items-center justify-center gap-3 py-12">
+            <div class="ticket-spinner"></div>
+            <p class="text-[11px] text-gray-400 font-medium">Generando previsualización…</p>
+          </div>
+          <!-- Imagen generada -->
+          <img id="ticket-preview-img" src="" alt="Ticket preview"
+               style="display:none;" class="w-full h-auto rounded-xl">
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="shrink-0 flex gap-2 px-5 py-4 border-t border-gray-100">
+        <button id="cancel-ticket-preview"
+                class="flex-1 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide border border-gray-200 rounded-xl hover:bg-gray-50 transition">
+          Cancelar
+        </button>
+        <button id="download-ticket-btn"
+                class="flex-2 flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white text-xs font-bold uppercase tracking-wide py-2.5 px-5 rounded-xl transition">
+          <i class="fas fa-download text-xs"></i> Descargar ticket
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODAL CONFIRMAR LOGOUT ── -->
+  <div id="logout-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 modal-backdrop">
+    <div class="bg-white rounded-2xl p-6 shadow-xl max-w-xs w-full text-center">
+      <i class="fas fa-sign-out-alt text-3xl text-primary mb-3"></i>
+      <h3 class="text-base font-bold text-gray-800 mb-1">¿Cerrar sesión?</h3>
+      <p class="text-xs text-gray-500 mb-5">Serás redirigido al login.</p>
+      <div class="flex gap-3">
+        <button id="confirm-logout" class="flex-1 bg-primary hover:bg-primary-dark text-white text-xs font-bold py-2.5 rounded-xl transition">Sí, salir</button>
+        <button id="cancel-logout"  class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-2.5 rounded-xl transition">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODAL CONFIRMAR ELIMINAR ── -->
+  <div id="delete-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 modal-backdrop">
+    <div class="bg-white rounded-2xl p-6 shadow-xl max-w-xs w-full text-center">
+      <i class="fas fa-trash-alt text-3xl text-red-400 mb-3"></i>
+      <h3 class="text-base font-bold text-gray-800 mb-1">¿Eliminar pedido?</h3>
+      <p class="text-xs text-gray-500 mb-5">Esta acción no se puede deshacer.</p>
+      <div class="flex gap-3">
+        <button id="confirm-delete" class="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-2.5 rounded-xl transition">Sí, eliminar</button>
+        <button id="cancel-delete"  class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-2.5 rounded-xl transition">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast"
+       class="fixed bottom-6 left-1/2 -translate-x-1/2 translate-y-4 opacity-0 z-[70]
+              bg-gray-900 text-white text-xs font-semibold px-5 py-3 rounded-full shadow-lg flex items-center gap-2"
+       style="transition: opacity .3s, transform .3s; pointer-events: none;">
+    <i id="toast-icon" class="fas fa-check-circle text-green-400"></i>
+    <span id="toast-msg">Acción realizada</span>
+  </div>
+
+  <script type="module" src="pedidos.js"></script>
+</body>
+</html>

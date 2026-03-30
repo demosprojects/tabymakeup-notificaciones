@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TabyMakeup | Iniciar sesión</title>
+  <link rel="stylesheet" href="login.css">
+  <link rel="icon" href="logo-icon.jpg" type="image/webp">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Dancing+Script&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="icon" href="https://cdn.jsdelivr.net/gh/Leogalazzo/tabymakeup@main/logo.png" type="image/webp">
+</head>
+<body>
+  <main class="login-main">
+    <div class="login-container">
+      <div class="logo-container">
+        <h1 class="logo">
+          <span class="nombre">Taby</span><span class="makeup">Makeup</span>
+        </h1>
+      </div>
+      <form id="login-form" class="login-form">
+        <h2 class="login-title">Iniciar sesión</h2>
+        <div id="login-message" class="login-message" style="display: none;"></div>
+        <div class="form-group">
+          <label for="email"><i class="fas fa-envelope"></i> Correo Electrónico</label>
+          <input type="email" id="email" placeholder="tuemail@dominio.com" required>
+        </div>
+        <div class="form-group">
+          <label for="password"><i class="fas fa-lock"></i> Contraseña</label>
+          <div class="input-wrapper">
+            <input type="password" id="password" placeholder="Ingresa tu contraseña" required>
+            <i class="fas fa-eye toggle-password" id="toggle-password"></i>
+          </div>
+        </div>
+        <button type="submit" class="btn-login">
+          <span class="btn-text">Ingresar</span>
+          <i class="fas fa-sign-in-alt btn-icon"></i>
+          <i class="fas fa-spinner fa-spin btn-spinner" style="display: none;"></i>
+        </button>
+      </form>
+      <div class="footer-redes">
+        <a href="https://www.instagram.com/taby.makeup/" target="_blank" aria-label="Instagram">
+          <i class="fab fa-instagram"></i>
+        </a>
+        <a href="https://www.facebook.com/" target="_blank" aria-label="Facebook">
+          <i class="fab fa-facebook-f"></i>
+        </a>
+        <a href="https://wa.me/5493735401893?text=Hola%20quiero%20hacer%20una%20consulta" target="_-blank" aria-label="WhatsApp">
+          <i class="fab fa-whatsapp"></i>
+        </a>
+      </div>
+    </div>
+  </main>
+  <footer class="login-footer">
+    <p>© 2025 TabyMakeup. Todos los derechos reservados.</p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module" src="login.js"></script>
+</body>
+</html>
+
