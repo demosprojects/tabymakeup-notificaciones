@@ -49,7 +49,7 @@
       from { opacity: 0; transform: translateY(12px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-    .order-card { animation: fadeInUp .25s ease both; }
+    .order-card { }
 
     .modal-backdrop {
       background: rgba(0,0,0,.45);
@@ -65,7 +65,71 @@
       pointer-events: none;
     }
 
-    /* Spinner para preview del ticket */
+    /* ── FILTER CHIPS ───────────────────────────────── */
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      transition: all .18s ease;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .filter-chip:not(.active) {
+      background: rgba(255,255,255,0.85);
+      border-color: #fbcfe8;
+      color: #6b7280;
+    }
+    .filter-chip:not(.active):hover {
+      border-color: #f9a8d4;
+      color: #374151;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(255,105,180,.15);
+    }
+    .filter-chip .chip-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 4px;
+      border-radius: 9999px;
+      font-size: 9px;
+      font-weight: 900;
+      background: rgba(0,0,0,.08);
+      transition: background .18s;
+    }
+    .filter-chip.active .chip-count {
+      background: rgba(255,255,255,.28);
+      color: inherit;
+    }
+    .filter-chip.active[data-estado="all"]        { background:#ff69b4; border-color:#ff69b4; color:#fff; box-shadow:0 2px 10px rgba(255,105,180,.35); }
+    .filter-chip.active[data-estado="pendiente"]  { background:#f59e0b; border-color:#f59e0b; color:#fff; box-shadow:0 2px 10px rgba(245,158,11,.3); }
+    .filter-chip.active[data-estado="contactado"] { background:#3b82f6; border-color:#3b82f6; color:#fff; box-shadow:0 2px 10px rgba(59,130,246,.3); }
+    .filter-chip.active[data-estado="cancelado"]  { background:#ef4444; border-color:#ef4444; color:#fff; box-shadow:0 2px 10px rgba(239,68,68,.3); }
+
+    /* ── BTN ESTADO SPINNER ─────────────────────────── */
+    @keyframes btn-spin { to { transform: rotate(360deg); } }
+    .btn-estado-spinner {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border: 1.5px solid rgba(255,255,255,.35);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: btn-spin .6s linear infinite;
+      flex-shrink: 0;
+    }
+    .chip[disabled] {
+      opacity: .65;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
     @keyframes spin { to { transform: rotate(360deg); } }
     .ticket-spinner {
       width: 28px; height: 28px;
@@ -74,6 +138,46 @@
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
     }
+
+    /* ── ARCHIVO MODAL ─────────────────────────────── */
+    @keyframes slideUpModal {
+      from { opacity: 0; transform: translateY(32px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    #archivo-modal .modal-inner {
+      animation: slideUpModal .3s cubic-bezier(.22,1,.36,1) both;
+    }
+
+    .archivo-card {
+      animation: fadeInUp .2s ease both;
+    }
+
+    /* Stat card gradiente archivo */
+    .archivo-stat {
+      background: linear-gradient(135deg, #fff5f7 0%, #fce7f3 100%);
+      border: 1px solid #fbcfe8;
+    }
+
+    /* Botón archivo en header */
+    #btn-archivo {
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    #btn-archivo:hover {
+      background: rgba(255,255,255,0.28);
+    }
+
+    /* Línea decorativa en el modal de archivo */
+    .archivo-header-line {
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #a855f7, #ff69b4, #a855f7, transparent);
+      border-radius: 99px;
+    }
+
+    /* Scrollbar para el modal de archivo */
+    #archivo-lista::-webkit-scrollbar { width: 4px; }
+    #archivo-lista::-webkit-scrollbar-track { background: #f5f3ff; }
+    #archivo-lista::-webkit-scrollbar-thumb { background: #c084fc; border-radius: 99px; }
   </style>
 </head>
 <body class="bg-gradient-taby min-h-screen">
@@ -90,6 +194,12 @@
         </span>
       </div>
       <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <!-- BOTÓN ARCHIVO -->
+        <button id="btn-archivo"
+                class="flex items-center gap-1.5 text-white text-xs font-bold uppercase tracking-wide px-3 py-2 rounded-lg transition">
+          <i class="fas fa-archive text-sm"></i>
+          <span class="hidden sm:inline">Archivo</span>
+        </button>
         <a href="admin.html"
            class="flex items-center gap-1.5 text-white/90 hover:text-white text-xs font-semibold uppercase tracking-wide transition px-3 py-2 rounded-lg hover:bg-white/10">
           <i class="fas fa-box-open text-sm"></i>
@@ -112,11 +222,11 @@
   <!-- MAIN -->
   <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
 
-    <!-- Título + filtros -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <!-- Título + búsqueda + ordenar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
       <div class="flex items-center gap-3">
         <h2 class="text-gray-800 text-xl font-bold tracking-tight">
-          <i class="fas fa-shopping-bag text-primary mr-1"></i> Pedidos
+          <i class="fas fa-shopping-bag text-primary mr-1"></i> Pedidos activos
         </h2>
         <span id="total-badge"
               class="bg-primary text-white text-[10px] font-black px-2.5 py-1 rounded-full">0</span>
@@ -128,15 +238,6 @@
                  class="pl-8 pr-3 py-2 text-xs border border-pink-200 rounded-lg bg-white/80 focus:outline-none focus:border-primary w-52 placeholder-gray-400">
           <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
         </div>
-        <!-- Filtro estado -->
-        <select id="filter-estado"
-                class="text-xs border border-pink-200 rounded-lg bg-white/80 px-3 py-2 focus:outline-none focus:border-primary cursor-pointer">
-          <option value="all">Todos los estados</option>
-          <option value="nuevo">Nuevos</option>
-          <option value="contactado">Contactado</option>
-          <option value="enviado">Enviado</option>
-          <option value="cancelado">Cancelado</option>
-        </select>
         <!-- Filtro pago -->
         <select id="filter-pago"
                 class="text-xs border border-pink-200 rounded-lg bg-white/80 px-3 py-2 focus:outline-none focus:border-primary cursor-pointer">
@@ -154,19 +255,24 @@
       </div>
     </div>
 
-    <!-- Stats -->
+    <!-- Chips de filtro por estado -->
+    <div id="filter-chips" class="flex flex-wrap gap-2 mb-6">
+      <!-- generados por JS -->
+    </div>
+
+    <!-- Stats (solo pedidos activos) -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
       <div class="bg-white/80 border border-pink-100 rounded-2xl p-4 shadow-sm">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Total</p>
+        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Activos</p>
         <p id="stat-total" class="text-2xl font-black text-gray-800">0</p>
       </div>
       <div class="bg-white/80 border border-pink-100 rounded-2xl p-4 shadow-sm">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-yellow-500 mb-1">Nuevos</p>
+        <p class="text-[10px] font-bold uppercase tracking-widest text-yellow-500 mb-1">Pendientes</p>
         <p id="stat-nuevos" class="text-2xl font-black text-yellow-500">0</p>
       </div>
       <div class="bg-white/80 border border-pink-100 rounded-2xl p-4 shadow-sm">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-green-500 mb-1">Enviados</p>
-        <p id="stat-enviados" class="text-2xl font-black text-green-500">0</p>
+        <p class="text-[10px] font-bold uppercase tracking-widest text-blue-500 mb-1">Contactados</p>
+        <p id="stat-enviados" class="text-2xl font-black text-blue-500">0</p>
       </div>
       <div class="bg-white/80 border border-pink-100 rounded-2xl p-4 shadow-sm">
         <p class="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Recaudado</p>
@@ -174,7 +280,7 @@
       </div>
     </div>
 
-    <!-- Lista de pedidos -->
+    <!-- Lista de pedidos activos -->
     <div id="orders-list" class="space-y-3">
       <div class="skeleton-wrap space-y-3">
         <div class="h-28 bg-white/60 rounded-2xl animate-pulse border border-pink-100"></div>
@@ -186,15 +292,102 @@
     <!-- Sin resultados -->
     <div id="empty-state" class="hidden text-center py-20">
       <i class="fas fa-shopping-bag text-4xl text-pink-200 mb-4"></i>
-      <p class="text-gray-400 text-sm font-semibold uppercase tracking-widest">Sin pedidos</p>
+      <p class="text-gray-400 text-sm font-semibold uppercase tracking-widest">Sin pedidos activos</p>
+      <p class="text-gray-300 text-xs mt-2">Los completados están en el Archivo</p>
     </div>
 
   </main>
 
-  <!-- FOOTER -->
-  <footer class="mt-16 py-6 text-center text-xs text-gray-400 border-t border-pink-100">
-    © 2025 TabyMakeup · Panel de administración
-  </footer>
+
+
+  <!-- ════════════════════════════════════════════
+       MODAL ARCHIVO DE COMPLETADOS
+  ════════════════════════════════════════════ -->
+  <div id="archivo-modal" class="fixed inset-0 z-[55] hidden flex items-end sm:items-center justify-center sm:p-4 modal-backdrop">
+    <div class="modal-inner bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-2xl flex flex-col"
+         style="max-height: 92vh;">
+
+      <!-- Línea decorativa top (mobile) -->
+      <div class="flex justify-center pt-3 pb-1 sm:hidden shrink-0">
+        <div class="w-10 h-1 bg-gray-200 rounded-full"></div>
+      </div>
+
+      <!-- Línea gradiente desktop -->
+      <div class="hidden sm:block archivo-header-line mx-6 mt-5 shrink-0"></div>
+
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 sm:px-6 py-4 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+               style="background: linear-gradient(135deg, #7c3aed, #a855f7);">
+            <i class="fas fa-archive text-white text-sm"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-gray-800">Archivo de completados</h3>
+            <p class="text-[10px] text-gray-400 font-semibold uppercase tracking-widest mt-0.5">Historial de pedidos finalizados</p>
+          </div>
+        </div>
+        <button id="close-archivo"
+                class="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition ml-3 shrink-0">
+          <i class="fas fa-times text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Stats del archivo -->
+      <div class="grid grid-cols-3 gap-3 px-5 sm:px-6 pb-4 shrink-0">
+        <!-- Total completados -->
+        <div class="archivo-stat rounded-2xl p-3 text-center">
+          <p class="text-[9px] font-black uppercase tracking-widest text-purple-400 mb-1">Pedidos</p>
+          <p id="archivo-stat-count" class="text-xl font-black text-purple-600">0</p>
+        </div>
+        <!-- Total dinero -->
+        <div class="col-span-2 rounded-2xl p-3 flex items-center gap-3"
+             style="background: linear-gradient(135deg, #fdf4ff, #fae8ff); border: 1px solid #e9d5ff;">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+               style="background: linear-gradient(135deg, #7c3aed, #a855f7);">
+            <i class="fas fa-coins text-white text-xs"></i>
+          </div>
+          <div>
+            <p class="text-[9px] font-black uppercase tracking-widest text-purple-400 mb-0.5">Total histórico recaudado</p>
+            <p id="archivo-stat-dinero" class="text-xl font-black text-purple-700">$0</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Búsqueda dentro del archivo -->
+      <div class="px-5 sm:px-6 pb-3 shrink-0">
+        <div class="relative">
+          <input id="archivo-search" type="text" placeholder="Buscar en archivo…"
+                 class="w-full pl-8 pr-3 py-2 text-xs border border-purple-200 rounded-xl bg-purple-50/50 focus:outline-none focus:border-purple-400 placeholder-gray-400">
+          <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+        </div>
+      </div>
+
+      <!-- Separador -->
+      <div class="border-t border-gray-100 mx-5 sm:mx-6 shrink-0"></div>
+
+      <!-- Lista scrolleable -->
+      <div id="archivo-lista" class="flex-1 overflow-y-auto px-5 sm:px-6 py-4 space-y-3 min-h-0">
+        <!-- vacío inicial -->
+        <div id="archivo-empty" class="hidden text-center py-16">
+          <div class="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+               style="background: linear-gradient(135deg, #f5f3ff, #ede9fe);">
+            <i class="fas fa-archive text-2xl text-purple-300"></i>
+          </div>
+          <p class="text-gray-400 text-sm font-semibold uppercase tracking-widest">Sin completados aún</p>
+          <p class="text-gray-300 text-xs mt-1">Los pedidos marcados como completados aparecerán aquí</p>
+        </div>
+      </div>
+
+      <!-- Footer del modal -->
+      <div class="shrink-0 px-5 sm:px-6 py-4 border-t border-gray-100 bg-gray-50/50 rounded-b-3xl">
+        <p class="text-[10px] text-gray-400 text-center">
+          <i class="fas fa-info-circle mr-1"></i>
+          Los pedidos completados se archivan automáticamente y no aparecen en la lista principal.
+        </p>
+      </div>
+    </div>
+  </div>
 
   <!-- ────────────────────────────────────────────
        MODAL DETALLE DEL PEDIDO
@@ -247,6 +440,12 @@
                         class="flex items-center gap-1 text-[10px] font-bold text-gray-500 hover:text-primary bg-white border border-gray-200 hover:border-pink-300 px-2.5 py-1 rounded-full transition">
                   <i class="far fa-copy text-[9px]"></i> Copiar
                 </button>
+                <!-- WhatsApp -->
+                <a id="dm-wa-btn" href="#" target="_blank" rel="noopener"
+                   title="Contactar por WhatsApp"
+                   class="flex items-center gap-1 text-[10px] font-bold text-white bg-green-500 hover:bg-green-600 px-2.5 py-1 rounded-full transition">
+                  <i class="fab fa-whatsapp text-[11px]"></i> WA
+                </a>
               </div>
             </div>
           </div>
@@ -289,13 +488,9 @@
 
       <!-- Acciones rápidas -->
       <div class="px-5 sm:px-6 pb-6 flex flex-col sm:flex-row gap-2">
-        <a id="dm-wa-btn" href="#" target="_blank" rel="noopener"
-           class="flex-1 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold uppercase tracking-wide py-3 rounded-xl transition">
-          <i class="fab fa-whatsapp text-base"></i> Contactar por WhatsApp
-        </a>
         <button id="dm-delete-btn"
-                class="flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 text-xs font-bold uppercase tracking-wide py-3 px-4 rounded-xl transition border border-red-200">
-          <i class="fas fa-trash-alt"></i> Eliminar
+                class="flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 text-xs font-bold uppercase tracking-wide py-3 px-4 rounded-xl transition border border-red-200 w-full">
+          <i class="fas fa-trash-alt"></i> Eliminar pedido
         </button>
       </div>
     </div>
@@ -364,13 +559,16 @@
   </div>
 
   <!-- ── MODAL CONFIRMAR ELIMINAR ── -->
-  <div id="delete-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 modal-backdrop">
+  <div id="delete-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center p-4 modal-backdrop">
     <div class="bg-white rounded-2xl p-6 shadow-xl max-w-xs w-full text-center">
       <i class="fas fa-trash-alt text-3xl text-red-400 mb-3"></i>
       <h3 class="text-base font-bold text-gray-800 mb-1">¿Eliminar pedido?</h3>
       <p class="text-xs text-gray-500 mb-5">Esta acción no se puede deshacer.</p>
       <div class="flex gap-3">
-        <button id="confirm-delete" class="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-2.5 rounded-xl transition">Sí, eliminar</button>
+        <button id="confirm-delete" class="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2">
+          <span id="confirm-delete-spinner" class="hidden btn-estado-spinner" style="border-color:rgba(255,255,255,.35);border-top-color:#fff;"></span>
+          <span id="confirm-delete-label">Sí, eliminar</span>
+        </button>
         <button id="cancel-delete"  class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-2.5 rounded-xl transition">Cancelar</button>
       </div>
     </div>
@@ -378,7 +576,7 @@
 
   <!-- TOAST -->
   <div id="toast"
-       class="fixed bottom-6 left-1/2 -translate-x-1/2 translate-y-4 opacity-0 z-[70]
+       class="fixed bottom-6 left-1/2 -translate-x-1/2 translate-y-4 opacity-0 z-[80]
               bg-gray-900 text-white text-xs font-semibold px-5 py-3 rounded-full shadow-lg flex items-center gap-2"
        style="transition: opacity .3s, transform .3s; pointer-events: none;">
     <i id="toast-icon" class="fas fa-check-circle text-green-400"></i>
