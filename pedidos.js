@@ -53,10 +53,13 @@ resetInactivity();
 const ordersList   = document.getElementById('orders-list');
 const emptyState   = document.getElementById('empty-state');
 const searchInput  = document.getElementById('search-input');
-const filterEstado = document.getElementById('filter-estado');
 const filterPago   = document.getElementById('filter-pago');
 const filterOrden  = document.getElementById('filter-orden');
 const totalBadge   = document.getElementById('total-badge');
+const filterChips  = document.getElementById('filter-chips');
+
+// Estado activo del filtro de chips (reemplaza al <select>)
+let filtroEstadoActivo = 'all';
 
 const statTotal   = document.getElementById('stat-total');
 const statNuevos  = document.getElementById('stat-nuevos');
@@ -74,6 +77,15 @@ const dmItems      = document.getElementById('dm-items');
 const dmTotal      = document.getElementById('dm-total');
 const dmEstadoBtns = document.getElementById('dm-estado-btns');
 const dmWaBtn      = document.getElementById('dm-wa-btn');
+
+// ── DOM REFS ARCHIVO ──────────────────────────────────────────────
+const archivoModal      = document.getElementById('archivo-modal');
+const archivoLista      = document.getElementById('archivo-lista');
+const archivoEmpty      = document.getElementById('archivo-empty');
+const archivoStatCount  = document.getElementById('archivo-stat-count');
+const archivoStatDinero = document.getElementById('archivo-stat-dinero');
+const archivoBadge      = document.getElementById('archivo-badge');
+const archivoSearch     = document.getElementById('archivo-search');
 
 // ── ESCUCHAR PEDIDOS EN TIEMPO REAL ───────────────────────────────
 function escucharPedidos() {
@@ -102,7 +114,6 @@ function escucharPedidos() {
     actualizarBadgeNuevos();
   }, err => {
     console.error('[Pedidos] onSnapshot error:', err);
-    // Reconectar en 5s
     _snapshotUnsub = null;
     setTimeout(escucharPedidos, 5000);
   });
@@ -119,7 +130,6 @@ function notificarNuevoPedido(pedido) {
   mostrarToast(`🛍️ Nuevo pedido de ${pedido.nombreCliente || 'cliente'}`, 'shopping-bag', 'text-pink-400', 7000);
   reproducirSonido();
 
-  // Notificación nativa del navegador
   if (Notification.permission === 'granted') {
     new Notification('TabyMakeup — Nuevo pedido 🎀', {
       body: `${pedido.nombreCliente || 'Cliente nuevo'} · $${calcularTotal(pedido.items).toLocaleString('es-AR')}`,
@@ -155,18 +165,19 @@ if ('Notification' in window && Notification.permission === 'default') {
 
 // ── BADGE NUEVOS (título de la pestaña) ───────────────────────────
 function actualizarBadgeNuevos() {
-  const cant = todosLosPedidos.filter(p => (p.estado || 'nuevo') === 'nuevo').length;
+  const cant = todosLosPedidos.filter(p => ['nuevo','pendiente'].includes(p.estado || 'pendiente')).length;
   document.title = cant > 0 ? `(${cant}) TabyMakeup | Pedidos` : 'TabyMakeup | Pedidos';
 }
 
-// ── FILTROS ───────────────────────────────────────────────────────
+// ── FILTROS (solo pedidos NO completados) ────────────────────────
 function aplicarFiltrosYRenderizar() {
   const texto  = searchInput.value.trim().toLowerCase();
-  const estado = filterEstado.value;
+  const estado = filtroEstadoActivo;
   const pago   = filterPago.value;
   const orden  = filterOrden.value;
 
-  let lista = [...todosLosPedidos];
+  // Excluir completados de la grilla principal
+  let lista = todosLosPedidos.filter(p => (p.estado || 'pendiente') !== 'completado');
 
   if (texto) {
     lista = lista.filter(p =>
@@ -174,7 +185,13 @@ function aplicarFiltrosYRenderizar() {
       p.contacto?.toLowerCase().includes(texto)
     );
   }
-  if (estado !== 'all') lista = lista.filter(p => (p.estado || 'nuevo') === estado);
+  if (estado !== 'all') {
+    if (estado === 'pendiente') {
+      lista = lista.filter(p => ['nuevo','pendiente'].includes(p.estado || 'pendiente'));
+    } else {
+      lista = lista.filter(p => p.estado === estado);
+    }
+  }
   if (pago !== 'all')   lista = lista.filter(p => p.medioPago?.toLowerCase().includes(pago));
 
   lista.sort((a, b) => {
@@ -187,17 +204,18 @@ function aplicarFiltrosYRenderizar() {
   totalBadge.textContent = lista.length;
 }
 
-[searchInput, filterEstado, filterPago, filterOrden].forEach(el => {
+[searchInput, filterPago, filterOrden].forEach(el => {
   el.addEventListener('input', aplicarFiltrosYRenderizar);
   el.addEventListener('change', aplicarFiltrosYRenderizar);
 });
 
-// ── STATS ─────────────────────────────────────────────────────────
+// ── STATS (solo pedidos activos, sin completados) ─────────────────
 function actualizarStats() {
-  const total    = todosLosPedidos.length;
-  const nuevos   = todosLosPedidos.filter(p => (p.estado || 'nuevo') === 'nuevo').length;
-  const enviados = todosLosPedidos.filter(p => p.estado === 'enviado').length;
-  const dinero   = todosLosPedidos
+  const activos  = todosLosPedidos.filter(p => (p.estado || 'pendiente') !== 'completado');
+  const total    = activos.length;
+  const nuevos   = activos.filter(p => ['nuevo','pendiente'].includes(p.estado || 'pendiente')).length;
+  const enviados = activos.filter(p => p.estado === 'contactado').length;
+  const dinero   = activos
     .filter(p => p.estado !== 'cancelado')
     .reduce((sum, p) => sum + calcularTotal(p.items), 0);
 
@@ -205,9 +223,168 @@ function actualizarStats() {
   statNuevos.textContent   = nuevos;
   statEnviados.textContent = enviados;
   statDinero.textContent   = `$${dinero.toLocaleString('es-AR')}`;
+
+  // Actualizar chips de filtro con conteos frescos
+  renderizarFilterChips();
 }
 
-// ── RENDER LISTA ──────────────────────────────────────────────────
+// ── FILTER CHIPS DE ESTADO ────────────────────────────────────────
+const CHIP_DEFS = [
+  { value: 'all',        label: 'Todos',      icon: 'fas fa-th-large'      },
+  { value: 'pendiente',  label: 'Pendiente',  icon: 'fas fa-clock'         },
+  { value: 'contactado', label: 'Contactado', icon: 'fas fa-phone'         },
+  { value: 'cancelado',  label: 'Cancelado',  icon: 'fas fa-times-circle'  },
+];
+
+function renderizarFilterChips() {
+  const activos = todosLosPedidos.filter(p => (p.estado || 'pendiente') !== 'completado');
+
+  const conteos = {
+    all:        activos.length,
+    pendiente:  activos.filter(p => ['nuevo','pendiente'].includes(p.estado || 'pendiente')).length,
+    contactado: activos.filter(p => p.estado === 'contactado').length,
+    cancelado:  activos.filter(p => p.estado === 'cancelado').length,
+  };
+
+  filterChips.innerHTML = '';
+  CHIP_DEFS.forEach(({ value, label, icon }) => {
+    const btn = document.createElement('button');
+    btn.className = `filter-chip${filtroEstadoActivo === value ? ' active' : ''}`;
+    btn.dataset.estado = value;
+    btn.innerHTML = `<i class="${icon}"></i> ${label} <span class="chip-count">${conteos[value]}</span>`;
+    btn.addEventListener('click', () => {
+      filtroEstadoActivo = value;
+      renderizarFilterChips();
+      aplicarFiltrosYRenderizar();
+    });
+    filterChips.appendChild(btn);
+  });
+}
+
+// ── ARCHIVO: actualizar modal y badge ─────────────────────────────
+function actualizarArchivo(filtroTexto = '') {
+  const completados = todosLosPedidos
+    .filter(p => (p.estado || 'nuevo') === 'completado')
+    .sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
+
+  // (badge eliminado del header)
+  const cant = completados.length;
+
+  // Stats del modal
+  const totalDinero = completados.reduce((sum, p) => sum + calcularTotal(p.items), 0);
+  archivoStatCount.textContent  = cant;
+  archivoStatDinero.textContent = `$${totalDinero.toLocaleString('es-AR')}`;
+
+  // Filtrar por búsqueda si hay texto
+  const texto = filtroTexto.trim().toLowerCase();
+  const lista = texto
+    ? completados.filter(p =>
+        p.nombreCliente?.toLowerCase().includes(texto) ||
+        p.contacto?.toLowerCase().includes(texto)
+      )
+    : completados;
+
+  // Limpiar lista (conservar el empty state)
+  const cards = archivoLista.querySelectorAll('.archivo-card');
+  cards.forEach(c => c.remove());
+
+  if (lista.length === 0) {
+    archivoEmpty.classList.remove('hidden');
+    return;
+  }
+  archivoEmpty.classList.add('hidden');
+
+  lista.forEach(p => {
+    const card = crearCardArchivo(p);
+    archivoLista.appendChild(card);
+  });
+}
+
+// ── CARD ARCHIVO ──────────────────────────────────────────────────
+function crearCardArchivo(pedido) {
+  const fecha       = toDate(pedido.fecha);
+  const fechaStr    = fecha.toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
+  const horaStr     = fecha.toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' });
+  const totalPedido = calcularTotal(pedido.items);
+
+  const card = document.createElement('div');
+  card.className = 'archivo-card bg-white border border-purple-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-purple-200 transition cursor-pointer';
+  card.dataset.id = pedido.id;
+
+  card.innerHTML = `
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- Avatar con check -->
+        <div class="shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
+             style="background: linear-gradient(135deg, #ede9fe, #ddd6fe);">
+          <i class="fas fa-check text-purple-500 text-sm"></i>
+        </div>
+        <div class="min-w-0">
+          <p class="text-sm font-bold text-gray-800 truncate">${escHtml(pedido.nombreCliente || 'Sin nombre')}</p>
+          <p class="text-xs text-gray-400 mt-0.5 truncate">
+            <i class="fas fa-phone text-[9px] mr-1"></i>${escHtml(pedido.contacto || '—')}
+            &nbsp;·&nbsp;
+            <i class="fas fa-credit-card text-[9px] mr-1"></i>${escHtml(pedido.medioPago || '—')}
+          </p>
+          <p class="text-[10px] text-gray-400 mt-1 line-clamp-1">
+            ${(pedido.items || []).map(i => `${escHtml(i.nombre)} x${i.cantidad}`).join(' · ')}
+          </p>
+        </div>
+      </div>
+      <div class="shrink-0 flex items-center gap-2">
+        <div class="text-right">
+          <p class="text-base font-black text-purple-600">$${totalPedido.toLocaleString('es-AR')}</p>
+          <p class="text-[9px] text-gray-400 mt-0.5">${fechaStr} ${horaStr}</p>
+          <span class="inline-flex items-center gap-1 mt-1 text-[9px] font-black uppercase tracking-wider text-purple-500 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+            <i class="fas fa-check-double text-[8px]"></i> Completado
+          </span>
+        </div>
+        <!-- Botón eliminar definitivo -->
+        <button class="archivo-delete-btn shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-600 border border-red-200 transition" title="Eliminar definitivamente">
+          <i class="fas fa-trash-alt text-xs"></i>
+        </button>
+      </div>
+    </div>`;
+
+  // Botón eliminar: no propaga el click a la card
+  card.querySelector('.archivo-delete-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    confirmarEliminarDesdeArchivo(pedido.id);
+  });
+
+  // Click en la card: abrir el detalle normal
+  card.addEventListener('click', () => {
+    cerrarArchivo();
+    setTimeout(() => abrirDetalle(pedido.id), 200);
+  });
+
+  return card;
+}
+
+// ── ABRIR / CERRAR ARCHIVO ────────────────────────────────────────
+function abrirArchivo() {
+  actualizarArchivo(archivoSearch.value);
+  archivoModal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarArchivo() {
+  archivoModal.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('btn-archivo').addEventListener('click', abrirArchivo);
+document.getElementById('close-archivo').addEventListener('click', cerrarArchivo);
+archivoModal.addEventListener('click', e => {
+  if (e.target === archivoModal) cerrarArchivo();
+});
+
+// Búsqueda dentro del archivo
+archivoSearch.addEventListener('input', () => {
+  actualizarArchivo(archivoSearch.value);
+});
+
+// ── RENDER LISTA PRINCIPAL ────────────────────────────────────────
 function renderizarLista(lista) {
   document.querySelector('.skeleton-wrap')?.remove();
 
@@ -221,18 +398,18 @@ function renderizarLista(lista) {
   lista.forEach(p => ordersList.appendChild(crearCard(p)));
 }
 
-// ── CARD ──────────────────────────────────────────────────────────
+// ── CARD PRINCIPAL ────────────────────────────────────────────────
 function crearCard(pedido) {
-  const estado      = pedido.estado || 'nuevo';
+  const estado      = pedido.estado || 'pendiente';
   const fecha       = toDate(pedido.fecha);
   const fechaStr    = fecha.toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
   const horaStr     = fecha.toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' });
   const totalPedido = calcularTotal(pedido.items);
-  const esNuevo     = estado === 'nuevo';
+  const esPendiente = ['nuevo','pendiente'].includes(estado);
   const chip        = chipEstado(estado);
 
   const card = document.createElement('div');
-  card.className = `order-card bg-white/90 border ${esNuevo ? 'border-yellow-300 shadow-yellow-100' : 'border-pink-100'} rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition cursor-pointer`;
+  card.className = `order-card bg-white/90 border ${esPendiente ? 'border-yellow-300 shadow-yellow-100' : 'border-pink-100'} rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition cursor-pointer`;
   card.dataset.id = pedido.id;
 
   card.innerHTML = `
@@ -244,7 +421,7 @@ function crearCard(pedido) {
         <div class="min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <p class="text-sm font-bold text-gray-800 truncate">${escHtml(pedido.nombreCliente || 'Sin nombre')}</p>
-            ${esNuevo ? '<span class="badge-new bg-yellow-400 text-yellow-900 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">Nuevo</span>' : ''}
+            ${esPendiente ? '<span class="badge-new bg-yellow-400 text-yellow-900 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide">Pendiente</span>' : ''}
           </div>
           <p class="text-xs text-gray-400 mt-0.5">
             <i class="fas fa-phone text-[9px] mr-1"></i>${escHtml(pedido.contacto || '—')}
@@ -258,7 +435,7 @@ function crearCard(pedido) {
       </div>
       <div class="shrink-0 flex flex-col items-end gap-2 text-right">
         <span class="chip ${chip.bgChip} ${chip.textChip}">
-          <i class="${chip.icon}"></i> ${capitalizar(estado)}
+          <i class="${chip.icon}"></i> ${chip.label}
         </span>
         <p class="text-base font-black text-gray-800">$${totalPedido.toLocaleString('es-AR')}</p>
         <p class="text-[9px] text-gray-400">${fechaStr} ${horaStr}</p>
@@ -275,7 +452,7 @@ function abrirDetalle(id) {
   if (!pedido) return;
 
   pedidoActualId = id;
-  const estado      = pedido.estado || 'nuevo';
+  const estado      = pedido.estado || 'pendiente';
   const fecha       = toDate(pedido.fecha);
   const totalPedido = calcularTotal(pedido.items);
 
@@ -314,16 +491,26 @@ function abrirDetalle(id) {
 
   dmTotal.textContent = `$${totalPedido.toLocaleString('es-AR')}`;
 
-  // Botones de estado
-  const estados = ['nuevo', 'contactado', 'enviado', 'cancelado'];
+  // ── Estado actual (chip de lectura) ───────────────────────────
+  const dmEstadoActual = document.getElementById('dm-estado-actual');
+  if (dmEstadoActual) {
+    const chip = chipEstado(estado);
+    dmEstadoActual.innerHTML = `
+      <span class="chip ${chip.bgChip} ${chip.textChip}">
+        <i class="${chip.icon}"></i> ${chip.label}
+      </span>`;
+  }
+
+  // ── Botones de cambio de estado (solo los 4 activos) ──────────
+  const estados = ['pendiente', 'contactado', 'completado', 'cancelado'];
   dmEstadoBtns.innerHTML = '';
   estados.forEach(e => {
     const chip  = chipEstado(e);
     const activo = e === estado;
     const btn  = document.createElement('button');
     btn.className = `chip ${activo ? chip.bgChip + ' ' + chip.textChip + ' ring-2 ring-offset-1 ring-current' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'} transition cursor-pointer`;
-    btn.innerHTML = `<i class="${chip.icon}"></i> ${capitalizar(e)}`;
-    if (!activo) btn.addEventListener('click', () => cambiarEstado(id, e));
+    btn.innerHTML = `<i class="${chip.icon}"></i> ${chip.label}`;
+    if (!activo) btn.addEventListener('click', () => cambiarEstado(id, e, btn));
     dmEstadoBtns.appendChild(btn);
   });
 
@@ -348,14 +535,30 @@ document.getElementById('close-detail').addEventListener('click', cerrarDetalle)
 detailModal.addEventListener('click', e => { if (e.target === detailModal) cerrarDetalle(); });
 
 // ── CAMBIAR ESTADO ────────────────────────────────────────────────
-async function cambiarEstado(id, nuevoEstado) {
+async function cambiarEstado(id, nuevoEstado, btnEl) {
+  // Bloquear TODOS los botones de estado mientras se guarda
+  const todosBtns = dmEstadoBtns.querySelectorAll('button');
+  todosBtns.forEach(b => b.setAttribute('disabled', ''));
+
+  // Spinner en el botón clickeado
+  const iconoOriginal = btnEl.innerHTML;
+  btnEl.innerHTML = `<span class="btn-estado-spinner"></span> ${capitalizar(nuevoEstado)}`;
+
   try {
     await updateDoc(doc(db, 'pedidos', id), { estado: nuevoEstado });
-    mostrarToast(`Estado: ${capitalizar(nuevoEstado)}`, 'check-circle', 'text-green-400');
+
+    const msg = nuevoEstado === 'completado'
+      ? '✅ Pedido archivado como completado'
+      : `Estado: ${capitalizar(nuevoEstado)}`;
+    const color = nuevoEstado === 'completado' ? 'text-purple-400' : 'text-green-400';
+
+    mostrarToast(msg, nuevoEstado === 'completado' ? 'archive' : 'check-circle', color);
     cerrarDetalle();
-    setTimeout(() => abrirDetalle(id), 200);
   } catch (e) {
     console.error(e);
+    // Restaurar botón si falla
+    btnEl.innerHTML = iconoOriginal;
+    todosBtns.forEach(b => b.removeAttribute('disabled'));
     mostrarToast('Error al actualizar estado', 'exclamation-circle', 'text-red-400');
   }
 }
@@ -373,6 +576,11 @@ deleteModal.addEventListener('click', e => { if (e.target === deleteModal) delet
 
 confirmDelete.addEventListener('click', async () => {
   if (!pedidoActualId) return;
+  const spinner = document.getElementById('confirm-delete-spinner');
+  const label   = document.getElementById('confirm-delete-label');
+  confirmDelete.disabled = true;
+  if (spinner) spinner.classList.remove('hidden');
+  if (label)   label.textContent = 'Eliminando…';
   try {
     await deleteDoc(doc(db, 'pedidos', pedidoActualId));
     deleteModal.classList.add('hidden');
@@ -381,6 +589,10 @@ confirmDelete.addEventListener('click', async () => {
   } catch (e) {
     console.error(e);
     mostrarToast('Error al eliminar', 'exclamation-circle', 'text-red-400');
+  } finally {
+    confirmDelete.disabled = false;
+    if (spinner) spinner.classList.add('hidden');
+    if (label)   label.textContent = 'Sí, eliminar';
   }
 });
 
@@ -418,55 +630,86 @@ function imprimirTicket(id) {
 
   const itemsHTML = (p.items || []).map(i => `
     <tr>
-      <td style="font-size:10px;padding:4px 0;">${escHtml(i.nombre)}${i.tono ? ` (${escHtml(i.tono)})` : ''}</td>
-      <td style="text-align:right;padding:4px 0;">${i.cantidad}</td>
-      <td style="text-align:right;padding:4px 0;">$${(i.precio * i.cantidad).toLocaleString('es-AR')}</td>
+      <td style="font-size:10px;padding:5px 0;">${escHtml(i.nombre)}${i.tono ? ` <span style="color:#c06;">(${escHtml(i.tono)})</span>` : ''}</td>
+      <td style="text-align:center;padding:5px 0;">${i.cantidad}</td>
+      <td style="text-align:right;padding:5px 0;">$${(i.precio * i.cantidad).toLocaleString('es-AR')}</td>
     </tr>`).join('');
 
   const html = `<!DOCTYPE html><html><head>
     <title>Ticket - ${escHtml(p.nombreCliente || '')}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
-      body { font-family:'Courier New',monospace; width:80mm; margin:0 auto; padding:10px; color:#000; font-size:12px; }
-      .header { text-align:center; border-bottom:1px dashed #000; padding-bottom:10px; margin-bottom:10px; }
-      .logo { font-size:18px; font-weight:bold; text-transform:uppercase; letter-spacing:2px; }
-      .info { margin-bottom:10px; line-height:1.6; }
-      table { width:100%; border-collapse:collapse; margin-bottom:10px; }
-      th { text-align:left; border-bottom:1px solid #000; font-size:10px; padding-bottom:3px; }
-      .total-row { border-top:1px dashed #000; padding-top:5px; text-align:right; font-size:14px; font-weight:bold; margin-top:4px; }
-      .footer { text-align:center; margin-top:16px; font-size:10px; border-top:1px solid #000; padding-top:10px; }
-      @media print { @page { margin:0; } }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      body { font-family:'Lato',sans-serif; width:80mm; margin:0 auto; padding:14px 12px 18px; color:#222; font-size:11px; background:#fff; }
+      .deco-line { height:2px; background:linear-gradient(90deg,transparent,#d4a0b0,#cc0066,#d4a0b0,transparent); border-radius:2px; margin-bottom:10px; }
+      .deco-line-thin { height:1px; background:linear-gradient(90deg,transparent,#d4a0b0,transparent); margin:8px 0; }
+      .header { text-align:center; padding-bottom:10px; }
+      .brand-taby { font-family:'Playfair Display',serif; font-size:22px; font-weight:700; letter-spacing:4px; color:#111; text-transform:uppercase; display:block; line-height:1; }
+      .brand-makeup { font-family:'Lato',sans-serif; font-size:8px; font-weight:300; letter-spacing:8px; text-transform:uppercase; color:#cc0066; display:block; margin-top:3px; }
+      .deco-ornament { font-size:10px; color:#cc0066; letter-spacing:5px; margin:7px 0 4px; display:block; opacity:.65; }
+      .ticket-date { font-size:8px; color:#888; letter-spacing:.5px; margin-top:5px; }
+      .disclaimer { font-size:7px; color:#bbb; letter-spacing:.4px; margin-top:3px; }
+      .section-label { font-size:7px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:#cc0066; margin-bottom:4px; }
+      .info-block { margin:10px 0; line-height:1.75; }
+      table { width:100%; border-collapse:collapse; margin:6px 0; }
+      th { font-size:8px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:#999; padding:4px 0; border-bottom:1px solid #e0c0cc; }
+      th:nth-child(2) { text-align:center; }
+      th:last-child { text-align:right; }
+      td { font-size:10px; padding:5px 0; border-bottom:1px dotted #eee; color:#333; vertical-align:top; }
+      td:nth-child(2) { text-align:center; }
+      td:last-child { text-align:right; white-space:nowrap; }
+      .total-row { margin-top:10px; padding-top:8px; border-top:1.5px solid #cc0066; display:flex; justify-content:space-between; align-items:baseline; }
+      .total-label { font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:#999; }
+      .total-amount { font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:#cc0066; }
+      .footer { text-align:center; margin-top:12px; padding-top:10px; }
+      .footer-thanks { font-family:'Playfair Display',serif; font-size:12px; color:#cc0066; margin-bottom:5px; font-style:italic; }
+      .footer-web { font-size:8px; letter-spacing:2px; color:#bbb; text-transform:uppercase; }
+      @media print { @page { margin:0; size:80mm auto; } body { padding:10px 10px 14px; } }
     </style></head><body>
+    <div class="deco-line"></div>
     <div class="header">
-      <div class="logo">TabyMakeup</div>
-      <div style="font-size:9px;margin-top:4px;">${fecha}</div>
-      <div style="font-size:8px;margin-top:3px;letter-spacing:.5px;">COMPROBANTE NO VÁLIDO COMO FACTURA</div>
+      <span class="brand-taby">Taby</span>
+      <span class="brand-makeup">Makeup</span>
+      <span class="deco-ornament">&mdash;&mdash;&mdash;&mdash;&mdash;</span>
+      <div class="ticket-date">${fecha}</div>
+      <div class="disclaimer">COMPROBANTE NO VALIDO COMO FACTURA</div>
     </div>
-    <div class="info">
-      <strong>CLIENTE:</strong> ${escHtml(p.nombreCliente || '')}<br>
-      <strong>CONTACTO:</strong> ${escHtml(p.contacto || '')}<br>
-      <strong>PAGO:</strong> ${escHtml(p.medioPago || '')}
-      ${p.nota ? `<br><strong>NOTA:</strong> ${escHtml(p.nota)}` : ''}
+    <div class="deco-line-thin"></div>
+    <div class="info-block">
+      <div class="section-label">Cliente</div>
+      ${escHtml(p.nombreCliente || '—')}<br>
+      <strong>Tel:</strong> ${escHtml(p.contacto || '—')}<br>
+      <strong>Pago:</strong> ${escHtml(p.medioPago || '—')}
+      ${p.nota ? `<br><strong>Nota:</strong> <em>${escHtml(p.nota)}</em>` : ''}
     </div>
+    <div class="deco-line-thin"></div>
+    <div class="section-label" style="margin-top:8px;">Detalle del pedido</div>
     <table>
       <thead><tr>
-        <th>DESCRIPCIÓN</th>
-        <th style="text-align:right">CANT</th>
-        <th style="text-align:right">TOTAL</th>
+        <th style="text-align:left;">Producto</th>
+        <th>Cant</th>
+        <th>Total</th>
       </tr></thead>
       <tbody>${itemsHTML}</tbody>
     </table>
-    <div class="total-row">TOTAL: $${calcularTotal(p.items).toLocaleString('es-AR')}</div>
-    <div class="footer">¡Gracias por tu compra! 🎀<br>tabymakeup.com.ar</div>
+    <div class="total-row">
+      <span class="total-label">Total</span>
+      <span class="total-amount">$${calcularTotal(p.items).toLocaleString('es-AR')}</span>
+    </div>
+    <div class="deco-line" style="margin-top:12px;margin-bottom:0;"></div>
+    <div class="footer">
+      <div class="footer-thanks">Gracias por tu compra</div>
+      <div class="footer-web">tabymakeup.com.ar</div>
+    </div>
     <script>window.onload=function(){window.print();setTimeout(()=>window.close(),500)}<\/script>
   </body></html>`;
 
-  const win = window.open('', '_blank', 'width=450,height=600');
+  const win = window.open('', '_blank', 'width=450,height=660');
   win.document.write(html);
   win.document.close();
 }
 
 // ── TICKET IMAGEN PNG ─────────────────────────────────────────────
-// Variables para el preview
 let _previewDataURL = null;
 let _previewNombre  = null;
 
@@ -479,7 +722,6 @@ async function previsualizarTicketImagen(id) {
   const p = todosLosPedidos.find(x => x.id === id);
   if (!p) return;
 
-  // Cargar html2canvas si no está
   if (!window.html2canvas) {
     await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
   }
@@ -517,46 +759,56 @@ async function generarCanvasTicket(p) {
   const wrapper = document.createElement('div');
   wrapper.style.cssText = [
     'position:fixed','left:-9999px','top:0',
-    'width:302px','background:#ffffff','color:#000',
-    "font-family:'Courier New',Courier,monospace",
-    'font-size:12px','padding:16px 12px',
+    'width:302px','background:#ffffff','color:#222',
+    "font-family:'Lato',Helvetica,Arial,sans-serif",
+    'font-size:11px','padding:14px 12px 18px',
     'box-sizing:border-box','z-index:-1'
   ].join(';');
 
+  const itemsRows = (p.items || []).map(i => `
+    <tr>
+      <td style="font-size:10px;padding:5px 0;border-bottom:1px dotted #eee;vertical-align:top;">${escHtml(i.nombre)}${i.tono ? `<br><span style="font-size:9px;color:#cc0066;">${escHtml(i.tono)}</span>` : ''}</td>
+      <td style="text-align:center;padding:5px 0;border-bottom:1px dotted #eee;">${i.cantidad}</td>
+      <td style="text-align:right;padding:5px 0;border-bottom:1px dotted #eee;white-space:nowrap;">$${(i.precio * i.cantidad).toLocaleString('es-AR')}</td>
+    </tr>`).join('');
+
   wrapper.innerHTML = `
-    <div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:10px;margin-bottom:10px;">
-      <div style="font-size:20px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;">TabyMakeup</div>
-      <div style="font-size:9px;margin-top:4px;">${fecha}</div>
-      <div style="font-size:8px;margin-top:3px;letter-spacing:.5px;">COMPROBANTE NO VÁLIDO COMO FACTURA</div>
+    <div style="height:2px;background:linear-gradient(90deg,transparent,#d4a0b0,#cc0066,#d4a0b0,transparent);border-radius:2px;margin-bottom:10px;"></div>
+    <div style="text-align:center;padding-bottom:10px;">
+      <div style="font-size:22px;font-weight:900;letter-spacing:5px;color:#111;text-transform:uppercase;line-height:1;font-family:Georgia,serif;">TABY</div>
+      <div style="font-size:8px;font-weight:300;letter-spacing:9px;text-transform:uppercase;color:#cc0066;margin-top:2px;">MAKEUP</div>
+      <div style="font-size:10px;color:#cc0066;letter-spacing:5px;margin:7px 0 4px;opacity:.65;">&mdash;&mdash;&mdash;&mdash;&mdash;</div>
+      <div style="font-size:8px;color:#888;letter-spacing:.5px;margin-top:5px;">${fecha}</div>
+      <div style="font-size:7px;color:#bbb;letter-spacing:.4px;margin-top:3px;">COMPROBANTE NO VALIDO COMO FACTURA</div>
     </div>
-    <div style="margin-bottom:10px;line-height:1.6;">
-      <strong>CLIENTE:</strong> ${escHtml(p.nombreCliente || '')}<br>
-      <strong>CONTACTO:</strong> ${escHtml(p.contacto || '')}<br>
-      <strong>PAGO:</strong> ${escHtml(p.medioPago || '')}
-      ${p.nota ? `<br><strong>NOTA:</strong> ${escHtml(p.nota)}` : ''}
+    <div style="height:1px;background:linear-gradient(90deg,transparent,#d4a0b0,transparent);margin:8px 0;"></div>
+    <div style="margin:10px 0;line-height:1.75;">
+      <div style="font-size:7px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#cc0066;margin-bottom:4px;">Cliente</div>
+      ${escHtml(p.nombreCliente || '—')}<br>
+      <strong>Tel:</strong> ${escHtml(p.contacto || '—')}<br>
+      <strong>Pago:</strong> ${escHtml(p.medioPago || '—')}
+      ${p.nota ? `<br><strong>Nota:</strong> <em>${escHtml(p.nota)}</em>` : ''}
     </div>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+    <div style="height:1px;background:linear-gradient(90deg,transparent,#d4a0b0,transparent);margin:8px 0;"></div>
+    <div style="font-size:7px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#cc0066;margin:8px 0 4px;">Detalle del pedido</div>
+    <table style="width:100%;border-collapse:collapse;margin:4px 0;">
       <thead>
         <tr>
-          <th style="text-align:left;border-bottom:1px solid #000;font-size:10px;padding-bottom:3px;">DESCRIPCIÓN</th>
-          <th style="text-align:right;border-bottom:1px solid #000;font-size:10px;padding-bottom:3px;">CANT</th>
-          <th style="text-align:right;border-bottom:1px solid #000;font-size:10px;padding-bottom:3px;">TOTAL</th>
+          <th style="text-align:left;font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#999;padding:4px 0;border-bottom:1px solid #e0c0cc;">Producto</th>
+          <th style="text-align:center;font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#999;padding:4px 0;border-bottom:1px solid #e0c0cc;">Cant</th>
+          <th style="text-align:right;font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#999;padding:4px 0;border-bottom:1px solid #e0c0cc;">Total</th>
         </tr>
       </thead>
-      <tbody>
-        ${(p.items || []).map(i => `
-          <tr>
-            <td style="font-size:10px;padding:4px 0;">${escHtml(i.nombre)}${i.tono ? ` (${escHtml(i.tono)})` : ''}</td>
-            <td style="text-align:right;padding:4px 0;">${i.cantidad}</td>
-            <td style="text-align:right;padding:4px 0;">$${(i.precio * i.cantidad).toLocaleString('es-AR')}</td>
-          </tr>`).join('')}
-      </tbody>
+      <tbody>${itemsRows}</tbody>
     </table>
-    <div style="border-top:1px dashed #000;margin-top:6px;padding-top:6px;text-align:right;font-size:14px;font-weight:bold;">
-      TOTAL: $${calcularTotal(p.items).toLocaleString('es-AR')}
+    <div style="margin-top:10px;padding-top:8px;border-top:1.5px solid #cc0066;display:flex;justify-content:space-between;align-items:baseline;">
+      <span style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#999;">Total</span>
+      <span style="font-size:18px;font-weight:900;color:#cc0066;font-family:Georgia,serif;">$${calcularTotal(p.items).toLocaleString('es-AR')}</span>
     </div>
-    <div style="text-align:center;margin-top:16px;font-size:10px;border-top:1px solid #000;padding-top:10px;">
-      ¡Gracias por tu compra! 🎀<br>tabymakeup.com.ar
+    <div style="height:2px;background:linear-gradient(90deg,transparent,#d4a0b0,#cc0066,#d4a0b0,transparent);border-radius:2px;margin-top:12px;"></div>
+    <div style="text-align:center;margin-top:12px;">
+      <div style="font-size:12px;color:#cc0066;font-family:Georgia,serif;font-style:italic;margin-bottom:5px;">Gracias por tu compra</div>
+      <div style="font-size:8px;letter-spacing:2px;color:#bbb;text-transform:uppercase;">tabymakeup.com.ar</div>
     </div>`;
 
   document.body.appendChild(wrapper);
@@ -570,7 +822,6 @@ async function generarCanvasTicket(p) {
   }
 }
 
-// Cerrar preview
 function cerrarPreviewTicket() {
   document.getElementById('ticket-preview-modal').classList.add('hidden');
   document.body.style.overflow = '';
@@ -583,7 +834,6 @@ document.getElementById('ticket-preview-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('ticket-preview-modal')) cerrarPreviewTicket();
 });
 
-// Descargar PNG
 document.getElementById('download-ticket-btn').addEventListener('click', () => {
   if (!_previewDataURL) return;
   const link = document.createElement('a');
@@ -593,6 +843,65 @@ document.getElementById('download-ticket-btn').addEventListener('click', () => {
   cerrarPreviewTicket();
   mostrarToast('Ticket descargado', 'download', 'text-green-400');
 });
+
+// ── ELIMINAR DESDE ARCHIVO ───────────────────────────────────────
+function confirmarEliminarDesdeArchivo(id) {
+  const deleteModal = document.getElementById('delete-modal');
+
+  // Bajar el z-index del archivo-modal a 0 para que no tape al delete-modal.
+  // backdrop-filter en cualquier elemento crea un stacking context propio en iOS/Safari
+  // que impide que elementos externos (por más z-index que tengan) queden encima visualmente.
+  archivoModal.style.zIndex = '0';
+  archivoModal.style.pointerEvents = 'none';
+
+  deleteModal.classList.remove('hidden');
+
+  function restaurar() {
+    archivoModal.style.zIndex = '';
+    archivoModal.style.pointerEvents = '';
+  }
+
+  function cerrarConfirm() {
+    deleteModal.classList.add('hidden');
+    restaurar();
+  }
+
+  document.getElementById('cancel-delete').addEventListener('click', cerrarConfirm, { once: true });
+
+  deleteModal.addEventListener('click', function onBd(e) {
+    if (e.target === deleteModal) { cerrarConfirm(); deleteModal.removeEventListener('click', onBd); }
+  });
+
+  document.getElementById('confirm-delete').addEventListener('click', function onOk() {
+    document.getElementById('confirm-delete').removeEventListener('click', onOk);
+    restaurar();
+    eliminarDesdeArchivo(id);
+  }, { once: true });
+}
+
+async function eliminarDesdeArchivo(id) {
+  const deleteModal   = document.getElementById('delete-modal');
+  const confirmBtn    = document.getElementById('confirm-delete');
+  const spinner       = document.getElementById('confirm-delete-spinner');
+  const label         = document.getElementById('confirm-delete-label');
+  if (confirmBtn) confirmBtn.disabled = true;
+  if (spinner)    spinner.classList.remove('hidden');
+  if (label)      label.textContent = 'Eliminando…';
+  try {
+    await deleteDoc(doc(db, 'pedidos', id));
+    deleteModal.classList.add('hidden');
+    actualizarArchivo(archivoSearch.value);
+    mostrarToast('Pedido eliminado definitivamente', 'trash-alt', 'text-red-400');
+  } catch (e) {
+    console.error(e);
+    deleteModal.classList.add('hidden');
+    mostrarToast('Error al eliminar', 'exclamation-circle', 'text-red-400');
+  } finally {
+    if (confirmBtn) confirmBtn.disabled = false;
+    if (spinner)    spinner.classList.add('hidden');
+    if (label)      label.textContent = 'Sí, eliminar';
+  }
+}
 
 // ── LOGOUT ────────────────────────────────────────────────────────
 const logoutModal   = document.getElementById('logout-modal');
@@ -620,12 +929,15 @@ function toDate(val) {
 
 function chipEstado(estado) {
   const map = {
-    nuevo:      { bgChip:'bg-yellow-100', textChip:'text-yellow-700', icon:'fas fa-star'         },
-    contactado: { bgChip:'bg-blue-100',   textChip:'text-blue-700',   icon:'fas fa-phone'        },
-    enviado:    { bgChip:'bg-green-100',  textChip:'text-green-700',  icon:'fas fa-check-circle' },
-    cancelado:  { bgChip:'bg-red-100',    textChip:'text-red-600',    icon:'fas fa-times-circle' },
+    nuevo:      { bgChip:'bg-yellow-100', textChip:'text-yellow-700', icon:'fas fa-clock',        label:'Pendiente'  },
+    pendiente:  { bgChip:'bg-yellow-100', textChip:'text-yellow-700', icon:'fas fa-clock',        label:'Pendiente'  },
+    contactado: { bgChip:'bg-blue-100',   textChip:'text-blue-700',   icon:'fas fa-phone',        label:'Contactado' },
+    cancelado:  { bgChip:'bg-red-100',    textChip:'text-red-600',    icon:'fas fa-times-circle', label:'Cancelado'  },
+    completado: { bgChip:'bg-purple-100', textChip:'text-purple-700', icon:'fas fa-check-double', label:'Completado' },
+    // legacy — por si hay pedidos viejos con estos estados en Firestore
+    enviado:    { bgChip:'bg-green-100',  textChip:'text-green-700',  icon:'fas fa-check-circle', label:'Enviado'    },
   };
-  return map[estado] || map.nuevo;
+  return map[estado] || map.pendiente;
 }
 
 function capitalizar(str) {
